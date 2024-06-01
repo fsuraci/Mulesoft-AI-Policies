@@ -1,0 +1,27 @@
+id: ToxicityAI-FS
+name: ToxicityAI-FS
+description: Check if a topic contains toxicity words
+category: Custom
+type: custom
+resourceLevelSupported: true
+encryptionSupported: false
+standalone: true
+requiredCharacteristics: []
+providedCharacteristics: []
+configuration: 
+  - propertyName: apikey
+    name: Api access key
+    description: Key for API access to Perspective AI
+    type: string
+    allowMultiple: false
+    optional: false    
+  - propertyName: payloadExpression
+    name: Payload Expression
+    description: Mule Expression used to extract the payload value from API requests
+    type: expression
+    defaultValue: "#[payload.message]"
+    optional: false
+    sensitive: false
+    allowMultiple: false
+  
+ 

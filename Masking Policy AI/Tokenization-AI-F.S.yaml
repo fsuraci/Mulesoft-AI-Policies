@@ -1,0 +1,27 @@
+id: TokenizationAI-FS
+name: TokenizationAI-FS
+description: Tokenize transforming fields values in the output response
+category: Custom
+type: custom
+resourceLevelSupported: true
+encryptionSupported: false
+standalone: true
+requiredCharacteristics: []
+providedCharacteristics: []
+configuration: 
+  - propertyName: auth
+    name: OpenaAI Authorization 
+    description: OpenAI Api authorization ('Bearer' + key)
+    type: string
+    allowMultiple: false
+    optional: false    
+  - propertyName: payloadExpression
+    name: Payload Expression
+    description: Mule Expression used to extract the payload value from API requests
+    type: expression
+    defaultValue: "#[payload.message]"
+    optional: false
+    sensitive: false
+    allowMultiple: false
+  
+ 

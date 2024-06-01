@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:core="http://www.mulesoft.org/schema/mule/core"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:http-policy="http://www.mulesoft.org/schema/mule/http-policy"
+	xmlns:http-transform="http://www.mulesoft.org/schema/mule/http-policy-transform" 
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd 
+	http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+	http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+               http://www.mulesoft.org/schema/mule/http-policy http://www.mulesoft.org/schema/mule/http-policy/current/mule-http-policy.xsd
+               http://www.mulesoft.org/schema/mule/http-policy-transform http://www.mulesoft.org/schema/mule/http-policy-transform/current/mule-http-policy-transform.xsd">
+
+<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="bf67102a-e997-42ca-a144-9a238716d332" >
+		<http:request-connection protocol="HTTPS" host="api.openai.com" port="443" >
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+		</http:request-connection>
+	</http:request-config>
+	<http-policy:proxy name="{{{policyId}}}-custom-policy">
+		<http-policy:source>
+			<try>
+			
+			<http-policy:execute-next />
+			
+				<set-variable variableName="auth" value="{{ auth }}" />
+				<set-variable variableName="input_payload" value="{{ payloadExpression }}" />
+				
+					<logger level="INFO" message="#['Payload:']" />
+				<logger level="INFO" message="#[vars.input_payload]" />
+				
+
+				<ee:transform>
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output text/plain
+---
+write(vars.input_payload,"application/json")]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		
+		<ee:transform>
+			<ee:message >
+				<ee:set-payload ><![CDATA[  %dw 2.0
+output application/json
+---
+{
+    "model": "gpt-3.5-turbo",
+    "messages": [
+      
+      {
+        "role": "user",
+        "content": "Mask,giving me only the result, with * fields that could contains sensitive/personal/private data in this request :" ++ payload
+      }
+    ]
+  }]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		
+		
+	
+		
+		
+						
+		
+		
+<logger level="INFO" message="#['Payload for AI:']" />
+				<logger level="INFO" message="#[payload]" />
+				
+				
+	<http:request method="POST" doc:name="Request" doc:id="540e38a7-46cf-4c01-8415-a0102bd6eab2" config-ref="HTTP_Request_configuration" path="/v1/chat/completions">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.auth
+}]]]></http:headers>
+		</http:request>			
+				
+				
+				
+
+
+<ee:transform>
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+
+read(payload.choices[0].message.content,"application/json")]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+
+
+
+<logger level="INFO"  message="#[payload]"/>
+		
+						
+				
+
+
+			
+		
+			
+				<error-handler>
+					<on-error-propagate logException="true">
+						<http-transform:set-response
+							statusCode="500">
+							<http-transform:body>#[
+								{{#if isWsdlEndpoint}}
+								output
+								application/xml --- Soap::clientErrorMessage(payload,
+								'$(error.detailedDescription)')
+								{{else}}
+								output application/json ---
+								{"error": "$(error.detailedDescription)"}
+								{{/if}}
+								]
+							</http-transform:body>
+						</http-transform:set-response>
+						<logger level="INFO" message="#[payload]" />
+					</on-error-propagate>
+				</error-handler>
+			</try>
+			
+		</http-policy:source>
+
+
+	</http-policy:proxy>
+</mule>

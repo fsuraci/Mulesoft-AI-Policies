@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:core="http://www.mulesoft.org/schema/mule/core"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:http-policy="http://www.mulesoft.org/schema/mule/http-policy"
+	xmlns:http-transform="http://www.mulesoft.org/schema/mule/http-policy-transform" 
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd 
+	http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+	http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+               http://www.mulesoft.org/schema/mule/http-policy http://www.mulesoft.org/schema/mule/http-policy/current/mule-http-policy.xsd
+               http://www.mulesoft.org/schema/mule/http-policy-transform http://www.mulesoft.org/schema/mule/http-policy-transform/current/mule-http-policy-transform.xsd">
+
+ <http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="5bae7385-062e-4397-8ae2-735f3f7c3b8d" >
+		<http:request-connection protocol="HTTPS" host="commentanalyzer.googleapis.com" port="443" >
+			<tls:context >
+				<tls:trust-store insecure="true" />
+			</tls:context>
+		</http:request-connection>
+	</http:request-config>
+	<http-policy:proxy name="{{{policyId}}}-custom-policy">
+		<http-policy:source>
+			<try>
+			
+			<http-policy:execute-next />
+			
+				<set-variable variableName="apikey" value="{{ apikey }}" />
+				<set-variable variableName="input_payload" value="{{ payloadExpression }}" />
+				
+					<logger level="INFO" message="#['Payload:']" />
+				<logger level="INFO" message="#[vars.input_payload]" />
+				
+
+				
+						
+		<ee:transform>
+			<ee:message>
+			<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"comment": {
+"text": vars.input_payload,
+           },
+"languages": ["en"],
+"requestedAttributes": {
+"TOXICITY":{}
+                       } 
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		
+<logger level="INFO" message="#['Payload for AI:']" />
+				<logger level="INFO" message="#[payload]" />
+<http:request method="POST" config-ref="HTTP_Request_configuration" path="#['/v1alpha1/comments:analyze?key=' ++ vars.apikey]" >
+			<http:body ><![CDATA[#[payload]]]></http:body>
+		</http:request>
+
+<set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;&#10; "evaluate": if(payload.attributeScores.TOXICITY.summaryScore.value &gt; 0.6)("YES") else("NO"),&#10; "toxicity": payload.attributeScores.TOXICITY.summaryScore.value as String&#10;}]' variableName="check_toxicity"/>
+	<ee:transform>
+			<ee:message>
+			<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"input_message": vars.input_payload,
+	"toxicity_status": vars.check_toxicity.evaluate,
+	"toxicity_value" : vars.check_toxicity.toxicity
+    
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+
+
+
+<logger level="INFO"  message="#[payload]"/>
+		
+						
+				
+
+
+			
+		
+			
+				<error-handler>
+					<on-error-propagate logException="true">
+						<http-transform:set-response
+							statusCode="500">
+							<http-transform:body>#[
+								{{#if isWsdlEndpoint}}
+								output
+								application/xml --- Soap::clientErrorMessage(payload,
+								'$(error.detailedDescription)')
+								{{else}}
+								output application/json ---
+								{"error": "$(error.detailedDescription)"}
+								{{/if}}
+								]
+							</http-transform:body>
+						</http-transform:set-response>
+						<logger level="INFO" message="#[payload]" />
+					</on-error-propagate>
+				</error-handler>
+			</try>
+			
+		</http-policy:source>
+
+
+	</http-policy:proxy>
+</mule>
